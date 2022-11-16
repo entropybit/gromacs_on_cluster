@@ -1,0 +1,91 @@
+#!/bin/bash
+prepare_simulation () {
+
+    #### PREPERATION ####
+
+	# generate topology and .gro file containing molecule
+	gmx pdb2gmx -f $PDB_NAME -o $OUT_NAME"".gro -p topol.top -ff charmm36-jul2021 -water tip3p -ignh
+	# write simulation geometry into .gro file
+	gmx editconf -f $OUT_NAME"".gro -o $OUT_NAME""_boxed.gro -c -d 0.7 -bt dodecahedron
+	# inser solvent
+	gmx solvate -cp $OUT_NAME""_boxed.gro -cs spc216.gro -o $OUT_NAME""_solv.gro -p topol.top
+	# generate atomic level description of system for genion
+	gmx grompp -f ions.mdp -c $OUT_NAME""_solv.gro -p topol.top -o ions.tpr -maxwarn 1
+	# add ions 
+	echo "13" | gmx genion -s ions.tpr -o $OUT_NAME""_ions.gro -p topol.top -pname SOD -nname CLA -neutral
+}
+
+prepare_simulation_vacuum () {
+
+    #### PREPERATION ####
+
+	# generate topology and .gro file containing molecule
+	gmx pdb2gmx -f $PDB_NAME -o $OUT_NAME""_vac.gro -p topol_vac.top -ff charmm36-jul2021 -water none -ignh
+	# write simulation geometry into .gro file
+	gmx editconf -f $OUT_NAME""_vac.gro -o $OUT_NAME""_vac_boxed.gro -c -d 0.7 -bt dodecahedron
+	# generate atomic level description of system for genion
+	#gmx grompp -f ions.mdp -c $OUT_NAME""_vac_boxed.gro -p topol_vac.top -o ions_vac.tpr -maxwarn 1
+	# add ions 
+	#gmx genion -s ions_vac.tpr -o $OUT_NAME""_ions_vac.gro -p topol_vac.top -pname SOD -nname CLA -neutral	
+}
+
+
+minimize_structure() {
+
+	#### MINIMIZATION ####
+	gmx grompp -f min.mdp -c $OUT_NAME""_ions.gro -p topol.top -o em.tpr
+	#mpiexec --np 16 gmx mdrun -ntomp 8 -v -deffnm em
+	gmx mdrun -v -deffnm em #-ntomp 64
+}
+
+minimize_structure_vacuum() {
+
+	#### MINIMIZATION ####
+	#gmx grompp -f "min_vacuum.mdp" -c $OUT_NAME""_vac_boxed.gro -p topol_vac.top -o em_vac.tpr
+    #gmx mdrun -v -deffnm em_vac -ntomp 64
+    mpirun -np 64 gmx mdrun -v -deffnm em_vac
+}
+
+nvt_equilibration() {
+	#### NVT EQUILIBRIATION ###
+	gmx grompp -f nvt.mdp -c em.gro -r em.gro -p topol.top -o nvt.tpr
+	#mpiexec --np 16 gmx mdrun -ntomp 8 -deffnm nvt -v
+	#exit
+	gmx mdrun -deffnm nvt -v -ntomp 64
+}
+
+npt_equilibration() {
+	#### NPT EQUILIBRIATION ###
+	gmx grompp -f npt.mdp -c nvt.gro -r nvt.gro -t nvt.cpt -p topol.top -o npt.tpr
+	#mpiexec --np 16 gmx mdrun -ntomp 8 -deffnm npt -v
+	gmx mdrun -deffnm npt -v -ntomp 64
+
+}
+
+make_productive_run_tpr() {
+	#### PRODUCTIVE RUN ####
+
+	#mpirun --np 1 --mca btl vader,self,tcp gmx grompp -f prod.mdp -c npt.gro -t npt.cpt -p topol.top -o $OUT_NAME""_md.tpr
+	gmx grompp -f prod.mdp -c npt.gro -t npt.cpt -p topol.top -o $OUT_NAME""_md.tpr
+	#mpiexec --np 16 gmx mdrun -ntomp 8 -deffnm ${OUT_NAME}""_md -v
+	#mpirun --np $1 --mca btl vader,self,tcp gmx mdrun -ntomp $2 -gpu_id $3 -deffnm $OUT_NAME""_md -v
+}
+
+PDB_NAME="INPUT.pdb"
+OUT_NAME="OUTPUTNAME"
+
+mkdir output
+cp -r input/* output
+cd output
+
+#prepare_simulation_vacuum
+prepare_simulation
+#minimize_structure_vacuum
+minimize_structure
+nvt_equilibration
+npt_equilibration
+make_productive_run_tpr
+
+
+
+

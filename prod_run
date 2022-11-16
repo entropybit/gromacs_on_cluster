@@ -1,0 +1,32 @@
+#!/bin/bash
+#SBATCH -J MDNAME
+#SBATCH -n 16
+#SBATCH -c 6
+#SBATCH --time=24:00:00
+#SBATCH --mem-per-cpu=3500
+#SBATCH -a 1-4%1
+
+OUT_NAME="OUTPUTNAME"
+
+module purge
+# replace this with whatever you need to load gromacs on your cluster
+module load gcc openmpi gromacs
+
+#cp -r input/* output
+cd output
+
+# sometimes minimization and NVT, NPT runs take too long and one might want
+# this to be done in the batch job
+## minimization
+#mpirun --np ${SLURM_NTASKS} gmx mdrun -ntomp ${SLURM_CPUS_PER_TASK} -v -deffnm em
+# nvt equilibration
+#gmx grompp -f nvt.mdp -c em.gro -r em.gro -p topol.top -o nvt.tpr
+#mpirun --np ${SLURM_NTASKS} gmx mdrun -ntomp ${SLURM_CPUS_PER_TASK} -v -deffnm nvt
+## npt equilibration
+#gmx grompp -f npt.mdp -c nvt.gro -r nvt.gro -t nvt.cpt -p topol.top -o npt.tpr
+#mpirun --np ${SLURM_NTASKS} gmx mdrun -ntomp ${SLURM_CPUS_PER_TASK} -v -deffnm npt
+
+# production run
+#gmx grompp -f prod.mdp -c npt.gro -t npt.cpt -p topol.top -o $OUT_NAME""_md.tpr
+mpirun --np ${SLURM_NTASKS} gmx mdrun -ntomp ${SLURM_CPUS_PER_TASK} -cpi ${OUT_NAME}""_md.cpt -deffnm $OUT_NAME""_md -v
+
