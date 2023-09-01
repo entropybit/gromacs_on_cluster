@@ -1,0 +1,17 @@
+#!/bin/bash
+
+gmx convert-tpr -s $1 -o benchmark_md.tpr -nsteps 2000
+mkdir benchmark_folder
+cp benchmark_md.tpr benchmark_folder/
+for NODES in {1..64}
+do
+    for NTOMP in 2 4 6 8
+    do
+        RANKS=$(($(($NODES*96))/$NTOMP))        
+#        echo ranks :: $ranks :: $ntomp
+        cp bench_batch_job benchmark_folder/bench_batch_job_${RANKS}_${NTOMP}
+        sed -i 's/RANKS/'$RANKS'/g' benchmark_folder/bench_batch_job_${RANKS}_${NTOMP}
+        sed -i 's/CORES/'$NTOMP'/g' benchmark_folder/bench_batch_job_${RANKS}_${NTOMP}
+        echo "sbatch benchmark_folder/bench_batch_job_${RANKS}_${NTOMP}"
+    done
+done

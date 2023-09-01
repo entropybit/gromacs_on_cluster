@@ -1,0 +1,21 @@
+#!/bin/bash
+#SBATCH -J AKHauschBench
+#SBATCH -n RANKS
+#SBATCH -c CORES
+#SBATCH --time=00:50:00
+#SBATCH --mem-per-cpu=3500
+#SBATCH -A project01916
+
+module purge
+module load gcc openmpi gromacs
+
+
+#mkdir benchmark
+cd benchmark
+#gmx grompp -f ../output/benchmark.mdp -c ../output/npt.gro -t ../output/npt.cpt -p ../output/topol.top -o benchmark_md.tpr
+
+echo "cp benchmark_md.tpr benchmark_${SLURM_NTASKS}_${SLURM_CPUS_PER_TASK}_md.tpr"
+cp benchmark_md.tpr benchmark_${SLURM_NTASKS}_${SLURM_CPUS_PER_TASK}_md.tpr
+echo "mpirun --np ${SLURM_NTASKS} gmx mdrun -ntomp ${SLURM_CPUS_PER_TASK} -deffnm benchmark_${SLURM_NTASKS}_${SLURM_CPUS_PER_TASK}_md -v"
+mpirun --np ${SLURM_NTASKS} gmx mdrun -ntomp ${SLURM_CPUS_PER_TASK} -deffnm benchmark_${SLURM_NTASKS}_${SLURM_CPUS_PER_TASK}_md -v
+
